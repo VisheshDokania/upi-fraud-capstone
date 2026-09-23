@@ -1,0 +1,12 @@
+.env
+data/
+*.csv
+*.npy
+notebooks/*_report/
+__pycache__/
+*.pyc
+.venv/
+venv/
+models/
+catboost_info/
+notebooks/graph_pipeline/

@@ -1,0 +1,9 @@
+# on top of the existing requirements.txt
+fastapi
+uvicorn[standard]
+streamlit
+requests
+joblib
+pytest
+httpx
+ruff
