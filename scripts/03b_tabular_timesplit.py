@@ -142,19 +142,48 @@ def main(smoke, models):
         try:
             t0 = time.time()
             m = fitters[name](Xtr, ytr, Xva, yva, cat_cols)
-            thr = best_f1_threshold(yva, predict(m, Xva))
-            res = evaluate(yte, predict(m, Xte), thr)
-            res.update(model=name, train_seconds=round(time.time() - t0, 1))
-            rows.append(res)
+            val_p = predict(m, Xva)
+            thr = best_f1_threshold(yva, val_p)
+            val_results = evaluate(yva, val_p, thr)
+            row = {
+                "model": name,
+                "val_pr_auc": val_results["pr_auc"],
+                "val_roc_auc": val_results["roc_auc"],
+                "val_f1": val_results["f1"],
+                "val_precision": val_results["precision"],
+                "val_recall": val_results["recall"],
+                "val_recall_at_1pct_fpr": val_results["recall_at_1pct_fpr"],
+                "threshold": thr,
+                "train_seconds": round(time.time() - t0, 1),
+            }
+            rows.append(row)
             fitted[name] = m
-            print(f"{name}: PR-AUC={res['pr_auc']:.4f} ROC-AUC={res['roc_auc']:.4f} F1={res['f1']:.4f} (thr {thr:.3f})")
+            print(
+                f"{name}: validation PR-AUC={row['val_pr_auc']:.4f} "
+                f"ROC-AUC={row['val_roc_auc']:.4f} F1={row['val_f1']:.4f} "
+                f"(threshold {thr:.3f})"
+            )
         except ImportError as e:
             print(f"skipping {name}: {e}")
-    summary = pd.DataFrame(rows).set_index("model").sort_values("pr_auc", ascending=False)
-    summary.to_csv(out_dir / "timesplit_summary.csv")
+
+    if not rows:
+        raise RuntimeError("No requested model could be trained; check installed model packages.")
+
+    summary = pd.DataFrame(rows).set_index("model").sort_values("val_pr_auc", ascending=False)
     winner = summary.index[0]
-    print("\n" + summary.round(4).to_string())
-    print(f"\nWinner by test PR-AUC: {winner}" + ("   [SMOKE TEST - NOT A RESULT]" if smoke else ""))
+    threshold = float(summary.loc[winner, "threshold"])
+    test_p = predict(fitted[winner], Xte)
+    test_results = evaluate(yte, test_p, threshold)
+    for metric, value in test_results.items():
+        summary.loc[winner, f"test_{metric}"] = value
+    summary.to_csv(out_dir / "timesplit_summary.csv")
+    print("\nValidation model comparison (winner selected by validation PR-AUC):")
+    print(summary.drop(columns=[c for c in summary.columns if c.startswith("test_")]).round(4).to_string())
+    print(f"\nSelected model: {winner}")
+    print("Test metrics for the selected model (test evaluated once):")
+    print(pd.Series(test_results).round(4).to_string())
+    if smoke:
+        print("[SMOKE TEST - NOT A RESULT]")
 
     # a few real test rows the dashboard can use as demo inputs
     demo = te.drop(columns=["isFraud"]).groupby(te["isFraud"]).head(10)
@@ -162,7 +191,7 @@ def main(smoke, models):
     bundle = {"name": winner, "model": fitted[winner], "features": list(Xtr.columns),
               "cat_cols": cat_cols,
               "cat_levels": {c: list(Xtr[c].cat.categories) for c in cat_cols},
-              "threshold": float(summary.loc[winner, "threshold"]),
+              "threshold": threshold,
               "smoke_test": smoke}
     target = MODEL_DIR / ("tabular_winner_SMOKE.pkl" if smoke else "tabular_winner.pkl")
     with open(target, "wb") as f:
