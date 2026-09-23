@@ -113,9 +113,9 @@ def fit_lgb(Xtr, ytr, Xva, yva, cat_cols):
     import lightgbm as lgb
     m = lgb.LGBMClassifier(n_estimators=3000, learning_rate=0.03, num_leaves=256, subsample=0.8,
                            subsample_freq=1, colsample_bytree=0.5, is_unbalance=True,
-                           random_state=RANDOM_STATE, verbose=-1)
+                           metric="average_precision", random_state=RANDOM_STATE, verbose=-1)
     m.fit(Xtr, ytr, eval_set=[(Xva, yva)], eval_metric="average_precision",
-          callbacks=[lgb.early_stopping(100, verbose=False)])
+          callbacks=[lgb.early_stopping(100, first_metric_only=True, verbose=False)])
     return m
 
 
