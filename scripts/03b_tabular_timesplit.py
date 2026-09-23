@@ -134,10 +134,16 @@ def main(smoke, models):
     levels = {c: list(Xtr[c].cat.categories) for c in cat_cols}
     Xva, yva = prep(va, cat_cols, levels)
     Xte, yte = prep(te, cat_cols, levels)
+    features = list(Xtr.columns)
+    cat_levels = {c: list(Xtr[c].cat.categories) for c in cat_cols}
     print(f"train {len(ytr):,} ({ytr.mean():.3%} fraud) | val {len(yva):,} | test {len(yte):,} ({yte.mean():.3%})")
 
     fitters = {"xgboost": fit_xgb, "lightgbm": fit_lgb, "catboost": fit_cat}
-    rows, fitted = [], {}
+    rows = []
+    winner = None
+    winner_model = None
+    winner_score = -np.inf
+    threshold = 0.5
     for name in models:
         try:
             t0 = time.time()
@@ -157,23 +163,31 @@ def main(smoke, models):
                 "train_seconds": round(time.time() - t0, 1),
             }
             rows.append(row)
-            fitted[name] = m
+            if np.isfinite(row["val_pr_auc"]) and row["val_pr_auc"] > winner_score:
+                winner = name
+                winner_model = m
+                winner_score = row["val_pr_auc"]
+                threshold = thr
             print(
                 f"{name}: validation PR-AUC={row['val_pr_auc']:.4f} "
                 f"ROC-AUC={row['val_roc_auc']:.4f} F1={row['val_f1']:.4f} "
                 f"(threshold {thr:.3f})"
             )
+            del m, val_p, val_results
+            gc.collect()
         except ImportError as e:
             print(f"skipping {name}: {e}")
 
-    if not rows:
-        raise RuntimeError("No requested model could be trained; check installed model packages.")
+    if winner_model is None:
+        raise RuntimeError("No requested model produced a finite validation PR-AUC.")
 
     summary = pd.DataFrame(rows).set_index("model").sort_values("val_pr_auc", ascending=False)
-    winner = summary.index[0]
-    threshold = float(summary.loc[winner, "threshold"])
-    test_p = predict(fitted[winner], Xte)
+    del Xtr, Xva, ytr, yva, tr, va
+    gc.collect()
+    test_p = predict(winner_model, Xte)
     test_results = evaluate(yte, test_p, threshold)
+    del test_p, Xte, yte
+    gc.collect()
     for metric, value in test_results.items():
         summary.loc[winner, f"test_{metric}"] = value
     summary.to_csv(out_dir / "timesplit_summary.csv")
@@ -188,9 +202,9 @@ def main(smoke, models):
     # a few real test rows the dashboard can use as demo inputs
     demo = te.drop(columns=["isFraud"]).groupby(te["isFraud"]).head(10)
     demo.assign(isFraud=te.loc[demo.index, "isFraud"]).to_csv(out_dir / "demo_transactions.csv", index=False)
-    bundle = {"name": winner, "model": fitted[winner], "features": list(Xtr.columns),
+    bundle = {"name": winner, "model": winner_model, "features": features,
               "cat_cols": cat_cols,
-              "cat_levels": {c: list(Xtr[c].cat.categories) for c in cat_cols},
+              "cat_levels": cat_levels,
               "threshold": threshold,
               "smoke_test": smoke}
     target = MODEL_DIR / ("tabular_winner_SMOKE.pkl" if smoke else "tabular_winner.pkl")
