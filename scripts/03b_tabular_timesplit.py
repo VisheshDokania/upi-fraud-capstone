@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from common_eval import best_f1_threshold, evaluate
+from common_eval import best_f1_threshold, evaluate, fix_string_categories
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -120,22 +120,17 @@ def fit_lgb(Xtr, ytr, Xva, yva, cat_cols):
 
 def fit_cat(Xtr, ytr, Xva, yva, cat_cols):
     from catboost import CatBoostClassifier
-    def fix(X):
-        X = X.copy()
-        for c in cat_cols:
-            X[c] = X[c].astype(object).fillna("missing").astype(str)
-        return X
     m = CatBoostClassifier(iterations=2000, learning_rate=0.08, depth=8, eval_metric="PRAUC",
                            auto_class_weights="Balanced", random_seed=RANDOM_STATE, verbose=False,
                            early_stopping_rounds=100, cat_features=cat_cols)
-    m.fit(fix(Xtr), ytr, eval_set=(fix(Xva), yva), use_best_model=True)
-    m._fix = fix  # used below for predict
+    m.fit(fix_string_categories(Xtr, cat_cols), ytr,
+          eval_set=(fix_string_categories(Xva, cat_cols), yva), use_best_model=True)
     return m
 
 
-def predict(m, X):
-    if hasattr(m, "_fix"):
-        X = m._fix(X)
+def predict(m, X, needs_str_cats=False, cat_cols=None):
+    if needs_str_cats:
+        X = fix_string_categories(X, cat_cols or [])
     return m.predict_proba(X)[:, 1]
 
 
@@ -209,7 +204,8 @@ def main(smoke, models):
         try:
             t0 = time.time()
             m = fitters[name](Xtr, ytr, Xva, yva, cat_cols)
-            val_p = predict(m, Xva)
+            needs_str_cats = name == "catboost"
+            val_p = predict(m, Xva, needs_str_cats, cat_cols)
             thr = best_f1_threshold(yva, val_p)
             val_results = evaluate(yva, val_p, thr)
             row = {
@@ -223,7 +219,7 @@ def main(smoke, models):
                 "threshold": thr,
                 "train_seconds": round(time.time() - t0, 1),
             }
-            test_p = predict(m, Xte)
+            test_p = predict(m, Xte, needs_str_cats, cat_cols)
             test_results = evaluate(yte, test_p, thr)
             row.update({f"test_{key}": value for key, value in test_results.items()})
             from sklearn.metrics import precision_recall_curve
@@ -241,7 +237,8 @@ def main(smoke, models):
             summary.to_csv(out_dir / "timesplit_summary.csv")
             bundle = {"name": name, "model": m, "features": features,
                       "cat_cols": cat_cols, "cat_levels": cat_levels,
-                      "threshold": thr, "smoke_test": smoke}
+                      "threshold": thr, "smoke_test": smoke,
+                      "needs_str_cats": needs_str_cats}
             model_target = MODEL_DIR / f"tabular_{name}{'_SMOKE' if smoke else ''}.pkl"
             with open(model_target, "wb") as f:
                 pickle.dump(bundle, f)
@@ -285,7 +282,8 @@ def main(smoke, models):
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(out_dir / "pr_curve.png", dpi=160)
-    fig.savefig(ROOT / "tabular_timesplit_pr_curve.png", dpi=160)
+    if not smoke:
+        fig.savefig(ROOT / "tabular_timesplit_pr_curve.png", dpi=160)
     plt.close(fig)
     summary.to_csv(out_dir / "timesplit_summary.csv")
     print("\nValidation model comparison (winner selected by validation PR-AUC):")

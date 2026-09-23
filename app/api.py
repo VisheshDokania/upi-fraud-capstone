@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from scripts.common_eval import fix_string_categories
 
 ROOT = Path(os.environ.get("UPI_PROJECT_ROOT", Path(__file__).resolve().parent.parent))
 MODEL_DIR = ROOT / "models"
@@ -79,7 +80,9 @@ def score_transaction(tx: TxIn):
     for c in b["cat_cols"]:
         row[c] = pd.Categorical(row[c], categories=b["cat_levels"][c])
     m = b["model"]
-    X = m._fix(row) if hasattr(m, "_fix") else row
+    if b.get("needs_str_cats", False):
+        row = fix_string_categories(row, b["cat_cols"])
+    X = row
     p = float(m.predict_proba(X)[:, 1][0])
     drivers = []
     try:

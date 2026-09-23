@@ -15,6 +15,14 @@ from sklearn.metrics import (average_precision_score, f1_score, precision_recall
                              precision_score, recall_score, roc_auc_score, roc_curve)
 
 
+def fix_string_categories(X, cat_cols):
+    """Convert categorical model inputs to CatBoost-compatible strings."""
+    X = X.copy()
+    for column in cat_cols:
+        X[column] = X[column].astype(object).fillna("missing").astype(str)
+    return X
+
+
 def best_f1_threshold(y_val, p_val):
     """Pick the threshold that maximises F1 on the validation set."""
     prec, rec, thr = precision_recall_curve(y_val, p_val)
