@@ -50,14 +50,37 @@ def load_ieee(smoke=False):
         logit = 1.5 * df["V1"] - 1.0 * df["V2"] - 3.5
         df["isFraud"] = (rng.random(n) < 1 / (1 + np.exp(-logit))).astype(int)
         return df
-    tr = pd.read_csv(DATA_DIR / "ieee_cis" / "train_transaction.csv")
+    tr_path = DATA_DIR / "ieee_cis" / "train_transaction.csv"
+    tr_dtypes = _compact_dtypes(tr_path, {"TransactionID", "TransactionDT", "isFraud"})
+    tr = pd.read_csv(tr_path, dtype=tr_dtypes)
     idp = DATA_DIR / "ieee_cis" / "train_identity.csv"
     if idp.exists():
-        tr = tr.merge(pd.read_csv(idp), on="TransactionID", how="left")
-    # downcast floats to halve memory on a laptop
+        id_dtypes = _compact_dtypes(idp, {"TransactionID"})
+        identity = pd.read_csv(idp, dtype=id_dtypes)
+        tr = tr.merge(identity, on="TransactionID", how="left")
+        del identity
+        gc.collect()
+    # Some columns inferred as integers in the sample may contain missing values later.
     fcols = tr.select_dtypes("float64").columns
     tr[fcols] = tr[fcols].astype("float32")
     return tr
+
+
+def _compact_dtypes(path, preserve):
+    """Infer low-memory read types from a small sample, preserving join/time keys."""
+    sample = pd.read_csv(path, nrows=1000)
+    dtypes = {}
+    for column, dtype in sample.dtypes.items():
+        if column in preserve:
+            continue
+        if pd.api.types.is_float_dtype(dtype):
+            dtypes[column] = "float32"
+        elif (pd.api.types.is_object_dtype(dtype)
+              or pd.api.types.is_string_dtype(dtype)):
+            dtypes[column] = "category"
+    del sample
+    gc.collect()
+    return dtypes
 
 
 def time_split(df):
@@ -126,6 +149,7 @@ def main(smoke, models):
         c for c in df.columns
         if pd.api.types.is_object_dtype(df[c].dtype)
         or pd.api.types.is_string_dtype(df[c].dtype)
+        or isinstance(df[c].dtype, pd.CategoricalDtype)
     ]
     tr, va, te = time_split(df)
     del df
