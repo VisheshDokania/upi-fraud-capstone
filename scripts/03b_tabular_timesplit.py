@@ -23,7 +23,9 @@ import argparse
 import gc
 import json
 import pickle
+import shutil
 import time
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -137,6 +139,40 @@ def predict(m, X):
     return m.predict_proba(X)[:, 1]
 
 
+def write_drift_report(va, te, Xva, Xte, out_dir):
+    """Write split label/time summaries and numeric validation-to-test drift."""
+    periods = []
+    for name, frame in (("validation", va), ("test", te)):
+        periods.append({
+            "period": name,
+            "rows": len(frame),
+            "transaction_dt_min": frame["TransactionDT"].min(),
+            "transaction_dt_max": frame["TransactionDT"].max(),
+            "fraud_rate": frame["isFraud"].mean(),
+        })
+    pd.DataFrame(periods).to_csv(out_dir / "period_summary.csv", index=False)
+
+    numeric = Xva.select_dtypes(include=[np.number]).columns.intersection(
+        Xte.select_dtypes(include=[np.number]).columns
+    )
+    drift = []
+    for column in numeric:
+        val, test = Xva[column], Xte[column]
+        val_mean, test_mean = val.mean(), test.mean()
+        pooled_std = np.sqrt((val.var() + test.var()) / 2)
+        smd = abs(val_mean - test_mean) / pooled_std if pooled_std > 0 else 0.0
+        drift.append({
+            "feature": column,
+            "abs_standardized_mean_difference": smd,
+            "validation_missing_rate": val.isna().mean(),
+            "test_missing_rate": test.isna().mean(),
+            "absolute_missing_rate_difference": abs(val.isna().mean() - test.isna().mean()),
+        })
+    pd.DataFrame(drift).sort_values(
+        "abs_standardized_mean_difference", ascending=False
+    ).to_csv(out_dir / "feature_drift.csv", index=False)
+
+
 def main(smoke, models):
     out_dir = OUT_DIR / "smoke" if smoke else OUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -156,6 +192,7 @@ def main(smoke, models):
     levels = {c: list(Xtr[c].cat.categories) for c in cat_cols}
     Xva, yva = prep(va, cat_cols, levels)
     Xte, yte = prep(te, cat_cols, levels)
+    write_drift_report(va, te, Xva, Xte, out_dir)
     del tr, va, te
     gc.collect()
     features = list(Xtr.columns)
@@ -165,10 +202,10 @@ def main(smoke, models):
     fitters = {"xgboost": fit_xgb, "lightgbm": fit_lgb, "catboost": fit_cat}
     rows = []
     winner = None
-    winner_model = None
     winner_score = -np.inf
-    threshold = 0.5
+    curve_paths = {}
     for name in models:
+        m = val_p = test_p = None
         try:
             t0 = time.time()
             m = fitters[name](Xtr, ytr, Xva, yva, cat_cols)
@@ -186,67 +223,85 @@ def main(smoke, models):
                 "threshold": thr,
                 "train_seconds": round(time.time() - t0, 1),
             }
+            test_p = predict(m, Xte)
+            test_results = evaluate(yte, test_p, thr)
+            row.update({f"test_{key}": value for key, value in test_results.items()})
+            from sklearn.metrics import precision_recall_curve
+            precision, recall, _ = precision_recall_curve(yte, test_p)
+            curve_path = out_dir / f"pr_curve_{name}.csv"
+            pd.DataFrame({"recall": recall, "precision": precision}).to_csv(
+                curve_path, index=False
+            )
+            curve_paths[name] = curve_path
+
             rows.append(row)
+            summary = pd.DataFrame(rows).set_index("model").sort_values(
+                "val_pr_auc", ascending=False, na_position="last"
+            )
+            summary.to_csv(out_dir / "timesplit_summary.csv")
+            bundle = {"name": name, "model": m, "features": features,
+                      "cat_cols": cat_cols, "cat_levels": cat_levels,
+                      "threshold": thr, "smoke_test": smoke}
+            model_target = MODEL_DIR / f"tabular_{name}{'_SMOKE' if smoke else ''}.pkl"
+            with open(model_target, "wb") as f:
+                pickle.dump(bundle, f)
+
             if np.isfinite(row["val_pr_auc"]) and row["val_pr_auc"] > winner_score:
                 winner = name
-                winner_model = m
                 winner_score = row["val_pr_auc"]
-                threshold = thr
             print(
                 f"{name}: validation PR-AUC={row['val_pr_auc']:.4f} "
+                f"test PR-AUC={row['test_pr_auc']:.4f} "
                 f"ROC-AUC={row['val_roc_auc']:.4f} F1={row['val_f1']:.4f} "
                 f"(threshold {thr:.3f})"
             )
-            del m, val_p, val_results
+            m = val_p = test_p = val_results = test_results = bundle = None
             gc.collect()
-        except ImportError as e:
-            print(f"skipping {name}: {e}")
+        except Exception as e:
+            print(f"failed {name}: {e}")
+            traceback.print_exc()
+            if not any(row.get("model") == name for row in rows):
+                rows.append({"model": name, "error": str(e)})
+            pd.DataFrame(rows).set_index("model").to_csv(
+                out_dir / "timesplit_summary.csv"
+            )
+            m = val_p = test_p = None
+            gc.collect()
 
-    if winner_model is None:
+    if winner is None:
         raise RuntimeError("No requested model produced a finite validation PR-AUC.")
 
     summary = pd.DataFrame(rows).set_index("model").sort_values("val_pr_auc", ascending=False)
-    del Xtr, Xva, ytr, yva
+    del Xtr, Xva, Xte, ytr, yva, yte
     gc.collect()
-    test_p = predict(winner_model, Xte)
-    test_results = evaluate(yte, test_p, threshold)
-    from sklearn.metrics import precision_recall_curve
-    precision, recall, _ = precision_recall_curve(yte, test_p)
-    curve = pd.DataFrame({"recall": recall, "precision": precision})
-    curve.to_csv(out_dir / "pr_curve.csv", index=False)
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(recall, precision, label=f"{winner} (test PR-AUC={test_results['pr_auc']:.4f})")
+    for name, path in curve_paths.items():
+        curve = pd.read_csv(path)
+        score = summary.loc[name, "test_pr_auc"]
+        ax.plot(curve["recall"], curve["precision"],
+                label=f"{name} (test PR-AUC={score:.4f})")
     ax.set(xlabel="Recall", ylabel="Precision", title="Time-split test precision-recall curve")
     ax.legend(loc="best")
     fig.tight_layout()
     fig.savefig(out_dir / "pr_curve.png", dpi=160)
+    fig.savefig(ROOT / "tabular_timesplit_pr_curve.png", dpi=160)
     plt.close(fig)
-    del test_p, Xte, yte
-    gc.collect()
-    for metric, value in test_results.items():
-        summary.loc[winner, f"test_{metric}"] = value
     summary.to_csv(out_dir / "timesplit_summary.csv")
     print("\nValidation model comparison (winner selected by validation PR-AUC):")
     print(summary.drop(columns=[c for c in summary.columns if c.startswith("test_")]).round(4).to_string())
     print(f"\nSelected model: {winner}")
-    print("Test metrics for the selected model (test evaluated once):")
-    print(pd.Series(test_results).round(4).to_string())
+    print("Each model was evaluated once on the fixed test period; selection used validation PR-AUC.")
     if smoke:
         print("[SMOKE TEST - NOT A RESULT]")
 
     # Keep only a small balanced sample for the dashboard demo.
     demo.to_csv(out_dir / "demo_transactions.csv", index=False)
-    bundle = {"name": winner, "model": winner_model, "features": features,
-              "cat_cols": cat_cols,
-              "cat_levels": cat_levels,
-              "threshold": threshold,
-              "smoke_test": smoke}
     target = MODEL_DIR / ("tabular_winner_SMOKE.pkl" if smoke else "tabular_winner.pkl")
-    with open(target, "wb") as f:
-        pickle.dump(bundle, f)
+    winner_source = MODEL_DIR / f"tabular_{winner}{'_SMOKE' if smoke else ''}.pkl"
+    shutil.copyfile(winner_source, target)
     with open(out_dir / "winner.json", "w") as f:
-        json.dump({"winner": winner, "threshold": bundle["threshold"], "smoke_test": smoke}, f, indent=2)
+        json.dump({"winner": winner, "smoke_test": smoke}, f, indent=2)
     print(f"Saved {target}")
 
 
