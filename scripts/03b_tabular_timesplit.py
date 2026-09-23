@@ -210,6 +210,18 @@ def main(smoke, models):
     gc.collect()
     test_p = predict(winner_model, Xte)
     test_results = evaluate(yte, test_p, threshold)
+    from sklearn.metrics import precision_recall_curve
+    precision, recall, _ = precision_recall_curve(yte, test_p)
+    curve = pd.DataFrame({"recall": recall, "precision": precision})
+    curve.to_csv(out_dir / "pr_curve.csv", index=False)
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(recall, precision, label=f"{winner} (test PR-AUC={test_results['pr_auc']:.4f})")
+    ax.set(xlabel="Recall", ylabel="Precision", title="Time-split test precision-recall curve")
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(out_dir / "pr_curve.png", dpi=160)
+    plt.close(fig)
     del test_p, Xte, yte
     gc.collect()
     for metric, value in test_results.items():
