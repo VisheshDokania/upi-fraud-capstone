@@ -206,7 +206,7 @@ def main(smoke, models):
         raise RuntimeError("No requested model produced a finite validation PR-AUC.")
 
     summary = pd.DataFrame(rows).set_index("model").sort_values("val_pr_auc", ascending=False)
-    del Xtr, Xva, ytr, yva, tr, va
+    del Xtr, Xva, ytr, yva
     gc.collect()
     test_p = predict(winner_model, Xte)
     test_results = evaluate(yte, test_p, threshold)
