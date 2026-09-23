@@ -60,9 +60,6 @@ def load_ieee(smoke=False):
         tr = tr.merge(identity, on="TransactionID", how="left")
         del identity
         gc.collect()
-    # Some columns inferred as integers in the sample may contain missing values later.
-    fcols = tr.select_dtypes("float64").columns
-    tr[fcols] = tr[fcols].astype("float32")
     return tr
 
 
@@ -73,7 +70,7 @@ def _compact_dtypes(path, preserve):
     for column, dtype in sample.dtypes.items():
         if column in preserve:
             continue
-        if pd.api.types.is_float_dtype(dtype):
+        if pd.api.types.is_numeric_dtype(dtype):
             dtypes[column] = "float32"
         elif (pd.api.types.is_object_dtype(dtype)
               or pd.api.types.is_string_dtype(dtype)):
@@ -154,10 +151,13 @@ def main(smoke, models):
     tr, va, te = time_split(df)
     del df
     gc.collect()
+    demo = te.groupby("isFraud", sort=False).head(10).copy()
     Xtr, ytr = prep(tr, cat_cols)
     levels = {c: list(Xtr[c].cat.categories) for c in cat_cols}
     Xva, yva = prep(va, cat_cols, levels)
     Xte, yte = prep(te, cat_cols, levels)
+    del tr, va, te
+    gc.collect()
     features = list(Xtr.columns)
     cat_levels = {c: list(Xtr[c].cat.categories) for c in cat_cols}
     print(f"train {len(ytr):,} ({ytr.mean():.3%} fraud) | val {len(yva):,} | test {len(yte):,} ({yte.mean():.3%})")
@@ -235,9 +235,8 @@ def main(smoke, models):
     if smoke:
         print("[SMOKE TEST - NOT A RESULT]")
 
-    # a few real test rows the dashboard can use as demo inputs
-    demo = te.drop(columns=["isFraud"]).groupby(te["isFraud"]).head(10)
-    demo.assign(isFraud=te.loc[demo.index, "isFraud"]).to_csv(out_dir / "demo_transactions.csv", index=False)
+    # Keep only a small balanced sample for the dashboard demo.
+    demo.to_csv(out_dir / "demo_transactions.csv", index=False)
     bundle = {"name": winner, "model": winner_model, "features": features,
               "cat_cols": cat_cols,
               "cat_levels": cat_levels,
