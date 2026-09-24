@@ -10,6 +10,7 @@ include = [
   "scripts/06b_export_nlp_models.py",
   "scripts/07b_explainability_new_winners.py",
   "scripts/08_fusion_elliptic.py",
+  "scripts/09_make_report_assets.py",
   "tests/**/*.py",
 ]
 
