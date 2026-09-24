@@ -19,7 +19,7 @@ NB = ROOT / "notebooks"
 st.set_page_config(page_title="UPI Fraud Detection", layout="wide")
 st.title("Real-time Digital Payment Fraud Detection")
 try:
-    st.caption(f"API: {API} - models loaded: {requests.get(API + '/health', timeout=3).json()['models_loaded']}")
+    st.caption(f"API: {API} - models loaded: {requests.get(API + '/health', timeout=30).json()['models_loaded']}")
 except Exception:
     st.error("API not reachable. Start it with: uvicorn app.api:app --port 8000")
 
@@ -38,7 +38,7 @@ with tab1:
     amt = st.number_input("TransactionAmt", value=float(feats.get("TransactionAmt", 100.0)))
     feats["TransactionAmt"] = amt
     if st.button("Score transaction"):
-        r = requests.post(API + "/score/transaction", json={"features": feats}).json()
+        r = requests.post(API + "/score/transaction", json={"features": feats}, timeout=30).json()
         if "fraud_probability" in r:
             st.metric("Fraud probability", f"{r['fraud_probability']:.1%}", r["risk"].upper())
             if r["top_drivers"]:
@@ -52,13 +52,13 @@ with tab2:
     text = st.text_area("Paste a payment-request SMS or a link",
                         "Your KYC is pending. Update now at http://bit.ly/upi-kyc to avoid account block")
     if st.button("Check"):
-        r = requests.post(API + "/score/text", json={"text": text, "kind": kind}).json()
+        r = requests.post(API + "/score/text", json={"text": text, "kind": kind}, timeout=30).json()
         st.metric("Suspicious probability", f"{r.get('suspicious_probability', 0):.1%}", r.get("risk", "").upper())
 
 with tab3:
     idx = st.number_input("Elliptic node index", min_value=0, value=0, step=1)
     if st.button("Show neighbourhood"):
-        r = requests.get(f"{API}/graph/node/{int(idx)}").json()
+        r = requests.get(f"{API}/graph/node/{int(idx)}", timeout=30).json()
         if "fused_risk" in r:
             st.metric("Fused risk (tabular + graph)", f"{r['fused_risk']:.1%}")
             st.dataframe(pd.DataFrame(r["neighbours"]))

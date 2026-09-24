@@ -37,6 +37,11 @@ def _load():
     if tab.exists():
         with open(tab, "rb") as f:
             STATE["tabular"] = pickle.load(f)
+        try:
+            import shap
+            STATE["shap_explainer"] = shap.TreeExplainer(STATE["tabular"]["model"])
+        except Exception as exc:
+            STATE["shap_error"] = f"{type(exc).__name__}: {exc}"
     for key, fname in [("sms", "sms_spam.joblib"), ("url", "phishing_url.joblib")]:
         p = MODEL_DIR / fname
         if p.exists():
@@ -68,7 +73,8 @@ def _risk_band(p, thr):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "models_loaded": sorted(k for k in STATE if k != "edge_index")}
+    public_keys = {"tabular", "sms", "url", "fused"}
+    return {"status": "ok", "models_loaded": sorted(public_keys.intersection(STATE))}
 
 
 @app.post("/score/transaction")
@@ -77,6 +83,10 @@ def score_transaction(tx: TxIn):
     if b is None:
         raise HTTPException(503, "tabular model not loaded - run scripts/03b_tabular_timesplit.py")
     row = pd.DataFrame([{c: tx.features.get(c, np.nan) for c in b["features"]}])
+    categorical = set(b["cat_cols"])
+    for column in b["features"]:
+        if column not in categorical:
+            row[column] = pd.to_numeric(row[column], errors="coerce")
     for c in b["cat_cols"]:
         row[c] = pd.Categorical(row[c], categories=b["cat_levels"][c])
     m = b["model"]
@@ -85,16 +95,26 @@ def score_transaction(tx: TxIn):
     X = row
     p = float(m.predict_proba(X)[:, 1][0])
     drivers = []
+    shap_error = STATE.get("shap_error")
     try:
-        import shap
-        sv = shap.TreeExplainer(m).shap_values(X)
-        sv = np.asarray(sv[1] if isinstance(sv, list) else sv)[0]
+        explainer = STATE.get("shap_explainer")
+        if explainer is None:
+            raise RuntimeError(shap_error or "SHAP explainer is unavailable")
+        sv = explainer.shap_values(X, check_additivity=False)
+        if isinstance(sv, list):
+            sv = sv[1] if len(sv) > 1 else sv[0]
+        sv = np.asarray(sv)
+        if sv.ndim == 3:
+            sv = sv[:, :, 1] if sv.shape[-1] > 1 else sv[:, :, 0]
+        sv = sv[0]
         top = np.argsort(-np.abs(sv))[:5]
         drivers = [{"feature": b["features"][i], "shap": float(sv[i])} for i in top]
-    except Exception:
-        pass  # SHAP is optional for scoring
+        shap_error = None
+    except Exception as exc:
+        shap_error = f"{type(exc).__name__}: {exc}"
     return {"model": b["name"], "fraud_probability": p, "threshold": b["threshold"],
-            "risk": _risk_band(p, b["threshold"]), "top_drivers": drivers}
+            "risk": _risk_band(p, b["threshold"]), "top_drivers": drivers,
+            "shap_error": shap_error}
 
 
 @app.post("/score/text")
