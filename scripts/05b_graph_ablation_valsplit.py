@@ -90,28 +90,52 @@ def run(cls, name, d, m):
     model.eval()
     with torch.no_grad():
         p = F.softmax(model(d.x, d.edge_index), 1)[:, 1].cpu().numpy()
+    val_mask = m["val"].cpu().numpy()
+    test_mask = m["test"].cpu().numpy()
     yv, yt = d.y[m["val"]].cpu().numpy(), d.y[m["test"]].cpu().numpy()
-    thr = best_f1_threshold(yv, p[m["val"].cpu().numpy()])
-    res = evaluate(yt, p[m["test"].cpu().numpy()], thr)
-    res["model"] = name
-    return model.cpu(), res, p
+    thr = best_f1_threshold(yv, p[val_mask])
+    val_results = evaluate(yv, p[val_mask], thr)
+    test_results = evaluate(yt, p[test_mask], thr)
+    return model.cpu(), val_results, test_results, p
 
 
 if __name__ == "__main__":
     d, masks, ts = load()
     print({k: int(v.sum()) for k, v in masks.items()})
-    rows, best = [], (None, -1, None, None)
+    rows = []
+    winner = None
+    winner_score = -np.inf
+    winner_model = winner_proba = winner_threshold = None
     for cls, name in [(GraphSAGENet, "GraphSAGE"), (GATNet, "GAT"), (GCNNet, "GCN")]:
-        model, res, p = run(cls, name, d, masks)
-        rows.append(res)
-        print(f"{name}: test PR-AUC {res['pr_auc']:.4f} F1 {res['f1']:.4f}")
-        if res["pr_auc"] > best[1]:
-            best = (name, res["pr_auc"], model, p)
-    df = pd.DataFrame(rows).set_index("model").sort_values("pr_auc", ascending=False)
+        model, val_results, test_results, p = run(cls, name, d, masks)
+        row = {"model": name}
+        row.update({f"val_{key}": value for key, value in val_results.items()})
+        row.update({f"test_{key}": value for key, value in test_results.items()})
+        rows.append(row)
+        df = pd.DataFrame(rows).set_index("model").sort_values(
+            "val_pr_auc", ascending=False
+        )
+        df.to_csv(OUT_DIR / "graph_valsplit_summary.csv")
+        print(f"{name}: validation PR-AUC {val_results['pr_auc']:.4f}; "
+              f"test PR-AUC {test_results['pr_auc']:.4f}")
+        if np.isfinite(val_results["pr_auc"]) and val_results["pr_auc"] > winner_score:
+            winner = name
+            winner_score = val_results["pr_auc"]
+            winner_model, winner_proba = model, p
+            winner_threshold = val_results["threshold"]
+        del model, val_results, test_results, p
+        import gc
+        gc.collect()
+
+    if winner_model is None:
+        raise RuntimeError("No graph model produced a finite validation PR-AUC.")
+    df = pd.DataFrame(rows).set_index("model").sort_values("val_pr_auc", ascending=False)
     df.to_csv(OUT_DIR / "graph_valsplit_summary.csv")
     print(df.round(4).to_string())
-    np.save(OUT_DIR / "gnn_node_proba.npy", best[3])
+    np.save(OUT_DIR / "gnn_node_proba.npy", winner_proba)
     with open(OUT_DIR / "winner_model.pkl", "wb") as f:
-        pickle.dump({"name": best[0], "model": best[2], "hidden": HIDDEN}, f)
-    json.dump({"winner": best[0]}, open(OUT_DIR / "winner.json", "w"))
-    print(f"Winner {best[0]}; node probabilities saved for Week 8 fusion.")
+        pickle.dump({"name": winner, "model": winner_model, "hidden": HIDDEN,
+                     "threshold": winner_threshold}, f)
+    with open(OUT_DIR / "winner.json", "w") as f:
+        json.dump({"winner": winner, "threshold": winner_threshold}, f)
+    print(f"Validation-selected winner: {winner}; node probabilities saved for Week 8 fusion.")
