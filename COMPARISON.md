@@ -32,6 +32,8 @@ Metrics are copied from `notebooks/graph_ablation_report/graph_ablation_summary.
 
 05b selects GraphSAGE by validation PR-AUC. GCN has the highest 05b test PR-AUC, but test scores do not select the model. Week 5's CSV has no PR-AUC and its original protocol selected using test F1, so the comparison is descriptive rather than like-for-like.
 
+The GNN's epoch selection used steps 30-32, the same steps used to fit the fusers; final test metrics on steps 35-49 are unaffected.
+
 ## Follow-up 4 Elliptic fusion
 
 Metrics are copied from `notebooks/fusion_report/fusion_summary.csv`. Base tabular predictions and learned fusers use labelled steps 30-32; thresholds are tuned on steps 33-34; final metrics use steps 35-49.

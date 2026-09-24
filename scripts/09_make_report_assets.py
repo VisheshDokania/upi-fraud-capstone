@@ -131,7 +131,9 @@ def main():
     ax.legend()
     finish_figure(fig, "nlp_test_metrics.png")
 
-    latency_plot = latency.loc[latency["group"].isin(["sms", "url"])].copy()
+    latency_plot = latency.loc[
+        latency["group"].isin(["transaction", "sms", "url", "graph"])
+    ].copy()
     x = np.arange(len(latency_plot))
     width = 0.36
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -139,7 +141,7 @@ def main():
     ax.bar(x + width / 2, latency_plot["p95_ms"], width, label="p95", color="#E1812C")
     ax.set_xticks(x, latency_plot["group"])
     ax.set_ylabel("Latency (ms)")
-    ax.set_title("Local text-scoring latency")
+    ax.set_title("Local API scoring latency")
     ax.legend()
     finish_figure(fig, "api_latency.png")
 
