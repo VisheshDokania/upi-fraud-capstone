@@ -1,6 +1,8 @@
 .env
 data/
 *.csv
+!docs/*.csv
+!docs/report_assets/*.csv
 *.npy
 notebooks/*_report/
 __pycache__/
