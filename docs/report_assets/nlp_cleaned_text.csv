@@ -1,0 +1,3 @@
+model,rows_before,conflicting_clean_texts_removed,rows_after_dedupe,test_pr_auc,test_f1_at_0_5
+sms,5572,0,5126,0.978049148614736,0.9277566539923956
+url,549346,1,500766,0.957379298481393,0.8854703202618868
