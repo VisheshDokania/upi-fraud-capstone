@@ -2,6 +2,7 @@
 Fast checks that need no real data and no torch."""
 import subprocess
 import sys
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from app.text_features import clean_text, clean_url  # noqa: E402
-from common_eval import best_f1_threshold, evaluate  # noqa: E402
+from common_eval import best_f1_threshold, evaluate, make_graph_masks  # noqa: E402
 
 
 def test_clean_text_keeps_link_signal():
@@ -53,3 +54,65 @@ def test_api_health_without_models(monkeypatch, tmp_path):
     with TestClient(api.app) as c:
         assert c.get("/health").json()["status"] == "ok"
         assert c.post("/score/text", json={"text": "hi", "kind": "sms"}).status_code == 503
+
+
+def test_api_coerces_null_numeric_input(monkeypatch, tmp_path):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    monkeypatch.setenv("UPI_PROJECT_ROOT", str(tmp_path))
+    import importlib
+    import app.api as api
+    importlib.reload(api)
+
+    class Model:
+        def predict_proba(self, X):
+            assert np.isnan(X.loc[0, "amount"])
+            assert np.isnan(X.loc[0, "count"])
+            return np.array([[0.1, 0.9]])
+
+    class Explainer:
+        def shap_values(self, X, check_additivity=False):
+            return np.zeros((1, X.shape[1]))
+
+    monkeypatch.setattr(api, "STATE", {})
+    from fastapi.testclient import TestClient
+    with TestClient(api.app) as client:
+        api.STATE["tabular"] = {
+            "name": "fake", "model": Model(), "features": ["amount", "count"],
+            "cat_cols": [], "threshold": 0.5, "needs_str_cats": False,
+        }
+        api.STATE["shap_explainer"] = Explainer()
+        response = client.post("/score/transaction", json={
+            "features": {"amount": None, "count": "not-a-number"}
+        })
+    assert response.status_code == 200
+    assert response.json()["fraud_probability"] == pytest.approx(0.9)
+    assert response.json()["shap_error"] is None
+
+
+def test_05b_graph_masks_keep_periods_disjoint():
+    y = np.array([1, -1, 0, 1, 0, 1, 0])
+    steps = np.array([29, 30, 32, 33, 34, 35, 49])
+    masks = make_graph_masks(y, steps)
+    assert np.flatnonzero(masks["train"]).tolist() == [0]
+    assert np.flatnonzero(masks["val"]).tolist() == [2]
+    assert np.flatnonzero(masks["threshold"]).tolist() == [3, 4]
+    assert np.flatnonzero(masks["test"]).tolist() == [5, 6]
+    assert not masks["val"][1]  # unlabelled node is excluded
+
+
+def test_fusion_threshold_uses_reserved_threshold_period():
+    spec = importlib.util.spec_from_file_location(
+        "fusion_module", ROOT / "scripts" / "08_fusion_elliptic.py"
+    )
+    fusion = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fusion)
+    steps = np.array([30, 31, 32, 33, 34])
+    y = np.array([1, 0, 1, 0, 1])
+    scores = np.array([0.95, 0.2, 0.7, 0.6, 0.55])
+    masks = fusion.masks(y, steps)
+    threshold = fusion.tune_threshold(y, scores, masks["threshold"])
+    expected = best_f1_threshold(y[masks["threshold"]], scores[masks["threshold"]])
+    fit_period_threshold = best_f1_threshold(y[masks["fuser_fit"]], scores[masks["fuser_fit"]])
+    assert threshold == expected
+    assert threshold != fit_period_threshold

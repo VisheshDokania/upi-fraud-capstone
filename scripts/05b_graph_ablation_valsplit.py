@@ -27,7 +27,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 
-from common_eval import best_f1_threshold, evaluate
+from common_eval import best_f1_threshold, evaluate, make_graph_masks
 from gnn_models import GATNet, GCNNet, GraphSAGENet
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,15 +50,16 @@ def load():
     tr_rows = np.isin(ts, list(TRAIN_STEPS))
     mu, sd = X[tr_rows].mean(0), X[tr_rows].std(0) + 1e-6
     X = (X - mu) / sd
-    labelled = y >= 0
-    masks = {k: torch.tensor(labelled & np.isin(ts, list(r))) for k, r in
-             [("train", TRAIN_STEPS), ("val", VAL_STEPS),
-              ("threshold", THRESHOLD_STEPS), ("test", TEST_STEPS)]}
+    masks = {key: torch.tensor(value) for key, value in masks_for_periods(y, ts).items()}
     # message passing in both directions: Elliptic edges are directed money flows
     ei_t = torch.tensor(ei, dtype=torch.long)
     ei_t = torch.cat([ei_t, ei_t.flip(0)], dim=1)
     d = Data(x=torch.tensor(X, dtype=torch.float), edge_index=ei_t, y=torch.tensor(y))
     return d, masks, ts
+
+
+def masks_for_periods(y, ts):
+    return make_graph_masks(y, ts)
 
 
 def run(cls, name, d, m):

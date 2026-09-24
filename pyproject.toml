@@ -8,6 +8,7 @@ include = [
   "scripts/03b_tabular_timesplit.py",
   "scripts/05b_graph_ablation_valsplit.py",
   "scripts/06b_export_nlp_models.py",
+  "scripts/07b_explainability_new_winners.py",
   "scripts/08_fusion_elliptic.py",
   "tests/**/*.py",
 ]

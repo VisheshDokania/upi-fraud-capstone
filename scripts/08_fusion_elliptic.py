@@ -34,7 +34,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, f1_score
 
-from common_eval import best_f1_threshold, evaluate
+from common_eval import best_f1_threshold, evaluate, make_time_masks
 
 ROOT = Path(__file__).resolve().parent.parent
 GRAPH_DIR = ROOT / "notebooks" / "graph_pipeline"
@@ -69,10 +69,17 @@ def load(smoke):
 
 
 def masks(y, ts):
-    lab = y >= 0
-    return {k: lab & np.isin(ts, list(r)) for k, r in
-            [("train", TRAIN_STEPS), ("fuser_fit", FUSER_FIT_STEPS),
-             ("threshold", THRESHOLD_STEPS), ("test", TEST_STEPS)]}
+    return make_time_masks(y, ts, {
+        "train": TRAIN_STEPS,
+        "fuser_fit": FUSER_FIT_STEPS,
+        "threshold": THRESHOLD_STEPS,
+        "test": TEST_STEPS,
+    })
+
+
+def tune_threshold(y, scores, threshold_mask):
+    """Tune F1 cutoff using only the reserved threshold-calibration rows."""
+    return best_f1_threshold(np.asarray(y)[threshold_mask], np.asarray(scores)[threshold_mask])
 
 
 def gate_features(p_tab, p_gnn, logdeg):
@@ -110,7 +117,7 @@ def main(smoke):
     tab_local = fit_tabular(X_local)
     p_tab_local = tab_local.predict_proba(X_local)[:, 1]
 
-    y_fit, y_threshold, yt = y[fit_mask], y[threshold_mask], y[m["test"]]
+    y_fit, yt = y[fit_mask], y[m["test"]]
     cand = {
         "tabular_only": p_tab,
         "tabular_local_only": p_tab_local,
@@ -136,7 +143,7 @@ def main(smoke):
 
     rows, per_step = [], []
     for name, p in cand.items():
-        thr = best_f1_threshold(y_threshold, p[threshold_mask])
+        thr = tune_threshold(y, p, threshold_mask)
         r = evaluate(yt, p[m["test"]], thr)
         row = {f"test_{key}": value for key, value in r.items()}
         row["model"] = name

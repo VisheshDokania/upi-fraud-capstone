@@ -23,6 +23,27 @@ def fix_string_categories(X, cat_cols):
     return X
 
 
+def make_time_masks(y, time_steps, periods):
+    """Build disjoint labelled-node masks from explicit time-step groups."""
+    y = np.asarray(y)
+    time_steps = np.asarray(time_steps)
+    labelled = y >= 0
+    return {
+        name: labelled & np.isin(time_steps, list(steps))
+        for name, steps in periods.items()
+    }
+
+
+def make_graph_masks(y, time_steps):
+    """05b labelled masks, with steps reserved for epoch and threshold tuning."""
+    return make_time_masks(y, time_steps, {
+        "train": range(1, 30),
+        "val": range(30, 33),
+        "threshold": range(33, 35),
+        "test": range(35, 50),
+    })
+
+
 def best_f1_threshold(y_val, p_val):
     """Pick the threshold that maximises F1 on the validation set."""
     prec, rec, thr = precision_recall_curve(y_val, p_val)
