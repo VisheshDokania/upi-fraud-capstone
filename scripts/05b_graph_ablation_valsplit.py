@@ -4,9 +4,10 @@ Week 5b - Graph ablation with a proper VALIDATION split (new file).
 Why: 05_graph_ablation.py picks the best epoch by looking at TEST-set F1, then
 reports that same test F1. That is test-set leakage - the reported numbers are
 optimistic. Here:
-  train      = labelled nodes in time steps 1-29
-  validation = labelled nodes in time steps 30-34   (epoch selection + threshold)
-  test       = labelled nodes in time steps 35-49   (touched once, at the end)
+train          = labelled nodes in time steps 1-29
+validation     = labelled nodes in time steps 30-32 (epoch selection)
+threshold tune = labelled nodes in time steps 33-34
+test           = labelled nodes in time steps 35-49
 Same models (gnn_models.py), same data arrays from Week 4.
 
 It also saves every node's predicted probability for the winner to
@@ -35,7 +36,9 @@ OUT_DIR = ROOT / "notebooks" / "graph_valsplit_report"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 HIDDEN, EPOCHS, LR, SEED = 64, 200, 0.01, 42
-TRAIN_STEPS, VAL_STEPS, TEST_STEPS = range(1, 30), range(30, 35), range(35, 50)
+TRAIN_STEPS, VAL_STEPS, THRESHOLD_STEPS, TEST_STEPS = (
+    range(1, 30), range(30, 33), range(33, 35), range(35, 50)
+)
 
 
 def load():
@@ -49,7 +52,8 @@ def load():
     X = (X - mu) / sd
     labelled = y >= 0
     masks = {k: torch.tensor(labelled & np.isin(ts, list(r))) for k, r in
-             [("train", TRAIN_STEPS), ("val", VAL_STEPS), ("test", TEST_STEPS)]}
+             [("train", TRAIN_STEPS), ("val", VAL_STEPS),
+              ("threshold", THRESHOLD_STEPS), ("test", TEST_STEPS)]}
     # message passing in both directions: Elliptic edges are directed money flows
     ei_t = torch.tensor(ei, dtype=torch.long)
     ei_t = torch.cat([ei_t, ei_t.flip(0)], dim=1)
@@ -91,9 +95,12 @@ def run(cls, name, d, m):
     with torch.no_grad():
         p = F.softmax(model(d.x, d.edge_index), 1)[:, 1].cpu().numpy()
     val_mask = m["val"].cpu().numpy()
+    threshold_mask = m["threshold"].cpu().numpy()
     test_mask = m["test"].cpu().numpy()
-    yv, yt = d.y[m["val"]].cpu().numpy(), d.y[m["test"]].cpu().numpy()
-    thr = best_f1_threshold(yv, p[val_mask])
+    yv = d.y[m["val"]].cpu().numpy()
+    y_threshold = d.y[m["threshold"]].cpu().numpy()
+    yt = d.y[m["test"]].cpu().numpy()
+    thr = best_f1_threshold(y_threshold, p[threshold_mask])
     val_results = evaluate(yv, p[val_mask], thr)
     test_results = evaluate(yt, p[test_mask], thr)
     return model.cpu(), val_results, test_results, p
