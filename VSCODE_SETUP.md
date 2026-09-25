@@ -1,3 +1,7 @@
+# Historical VS Code setup guide
+
+> Some sections below describe the original Weeks 1-7 workflow and are not current instructions for the five-tab `upi-synthetic` demo. For current setup, artifact generation, results and run commands, use [README.md](README.md) and [DEMO.md](DEMO.md).
+
 # Running This Project in VS Code — Full Setup Guide
 
 ## Why this fixes the Colab RAM crash
