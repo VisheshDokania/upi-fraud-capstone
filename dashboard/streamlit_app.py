@@ -30,19 +30,35 @@ st.markdown(
     """
     <style>
     :root {
-      --ink: #172635; --muted: #657482; --line: #dbe2e7; --paper: #f4f6f7;
-      --panel: #ffffff; --navy: #102b3d; --blue: #22617a;
-      --low: #187457; --low-bg: #e9f5ef; --mid: #9a6700; --mid-bg: #fff4dc;
-      --high: #b43732; --high-bg: #fff0ef;
+      color-scheme: dark;
+      --ink: #e8eff3; --muted: #a8bbc7; --line: #324957; --paper: #0b1720;
+      --panel: #122430; --navy: #1b3c4d; --blue: #67afc2;
+      --low: #72d0a6; --low-bg: #123b32; --mid: #f3c76b; --mid-bg: #44361c;
+      --high: #ff938d; --high-bg: #492622;
     }
     html, body, [class*="css"] { font-family: 'Segoe UI', Arial, sans-serif; }
     .stApp { background: var(--paper); color: var(--ink); }
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stNumberInput"] input {
+      color: var(--ink) !important;
+      caret-color: var(--ink);
+      background-color: var(--panel) !important;
+      border-color: var(--line) !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder {
+      color: var(--muted) !important;
+      opacity: 1;
+    }
     .block-container { max-width: 1440px; padding-top: 2rem; padding-bottom: 4rem; }
     h1, h2, h3 { letter-spacing: -0.035em; color: var(--ink); }
     h1 { font-size: 2.05rem !important; font-weight: 800 !important; }
     h2 { font-size: 1.38rem !important; font-weight: 750 !important; }
     h3 { font-size: 1.08rem !important; font-weight: 700 !important; }
     p, label, li { color: var(--ink); }
+    a { color: var(--blue); }
+    [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color: var(--muted); }
     .eyebrow { color: var(--blue); font: 500 .73rem Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
     .hero { background: var(--navy); color: #f4f7f8; padding: 1.55rem 1.8rem; border-radius: 8px;
       border-left: 4px solid #70a6ad; margin: .6rem 0 1.15rem; }
@@ -65,18 +81,80 @@ st.markdown(
     .small-note { color: var(--muted); font-size: .82rem; line-height: 1.55; }
     .factor-up { color: var(--high); font: 600 .76rem Consolas, monospace; }
     .factor-down { color: var(--low); font: 600 .76rem Consolas, monospace; }
-    .step { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .8rem .9rem; min-height: 88px; }
+    .step { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .8rem .9rem; min-height: 88px; }
     .step-n { color: var(--blue); font: 500 .68rem Consolas, monospace; }
     .step-t { color: var(--ink); font-weight: 700; margin-top: .35rem; font-size: .9rem; }
     .step-d { color: var(--muted); font-size: .77rem; margin-top: .18rem; line-height: 1.4; }
-    div[data-testid="stMetric"] { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .8rem 1rem; }
-    div[data-testid="stMetricLabel"] { color: var(--muted); }
-    div[data-testid="stMetricValue"] { color: var(--ink); font-weight: 750; }
-    div[data-testid="stTabs"] button { font-weight: 700; }
+    div[data-testid="stMetric"] { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .9rem 1rem; }
+    div[data-testid="stMetricLabel"], div[data-testid="stMetricLabel"] * { color: var(--muted) !important; }
+    div[data-testid="stMetricValue"], div[data-testid="stMetricValue"] * { color: var(--ink) !important; font-weight: 750; }
+    div[data-testid="stTabs"] button { font-weight: 700; color: var(--muted) !important; }
+    div[data-testid="stTabs"] button[aria-selected="true"] { color: var(--ink) !important; }
     .stButton > button, .stFormSubmitButton > button { border-radius: 5px; border: 1px solid var(--navy);
       background: var(--navy); color: #fff; font-weight: 700; padding: .55rem 1rem; }
     .stButton > button:hover, .stFormSubmitButton > button:hover { border-color: var(--blue); background: var(--blue); color: #fff; }
-    div[data-testid="stVerticalBlockBorderWrapper"] { border-color: var(--line); border-radius: 7px; }
+    .stButton > button, .stFormSubmitButton > button,
+    .stButton > button *, .stFormSubmitButton > button * {
+      color: #f4f7f8 !important;
+      -webkit-text-fill-color: #f4f7f8 !important;
+    }
+    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
+    [data-testid="stTextInput"] label, [data-testid="stTextArea"] label,
+    [data-testid="stSelectbox"] label, [data-testid="stNumberInput"] label,
+    [data-testid="stRadio"] label, [data-testid="stCheckbox"] label,
+    [data-testid="stSlider"] label, [data-testid="stMultiSelect"] label,
+    [data-testid="stDateInput"] label, [data-testid="stTimeInput"] label {
+      color: var(--ink) !important;
+    }
+    [data-testid="stWidgetLabel"] { margin-bottom: .35rem; }
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    [data-testid="stMultiSelect"] [data-baseweb="select"],
+    [data-testid="stDateInput"] [data-baseweb="input"],
+    [data-testid="stTimeInput"] [data-baseweb="input"] {
+      background-color: var(--panel) !important;
+      border-color: var(--line) !important;
+    }
+    [data-testid="stSelectbox"] [data-baseweb="select"] *,
+    [data-testid="stMultiSelect"] [data-baseweb="select"] *,
+    [data-testid="stDateInput"] [data-baseweb="input"] *,
+    [data-testid="stTimeInput"] [data-baseweb="input"] * {
+      color: var(--ink) !important;
+      -webkit-text-fill-color: var(--ink) !important;
+    }
+    [data-testid="stSelectbox"] [data-baseweb="select"] svg,
+    [data-testid="stMultiSelect"] [data-baseweb="select"] svg { fill: var(--muted); }
+    [role="listbox"], [role="option"], [role="listbox"] * {
+      color: var(--ink) !important;
+      background-color: var(--panel) !important;
+    }
+    [data-testid="stRadio"] [role="radio"],
+    [data-testid="stCheckbox"] [role="checkbox"] { border-color: var(--muted); }
+    [data-testid="stExpander"] details {
+      background-color: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary * {
+      color: var(--ink) !important;
+    }
+    [data-testid="stExpander"] summary { padding: .55rem .75rem; }
+    [data-testid="stExpander"] summary:hover { background-color: #1a3341; }
+    [data-testid="stAlert"], [data-testid="stAlert"] * {
+      color: var(--ink) !important;
+    }
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
+      color: var(--ink) !important;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    [data-testid="stDataFrame"] canvas {
+      color-scheme: dark;
+    }
+    [data-testid="stDataFrame"] [role="columnheader"],
+    [data-testid="stDataFrame"] [role="gridcell"] { color: var(--ink) !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"] { background: var(--panel); border-color: var(--line); border-radius: 7px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -531,6 +609,358 @@ def render_model_tab(api_online, health):
             )
 
 
+UPI_MODEL_PATH = ROOT / "models" / "upi_synthetic_model.pkl"
+UPI_COEFFICIENTS_PATH = NB / "upi_synthetic_report" / "upi_synthetic_coefficients.csv"
+UPI_PRESETS = {
+    "collect": {
+        "amount": 18_000.0, "transaction_type": "P2P",
+        "initiation_mode": "Collect Request", "merchant_mcc": None,
+        "failed_pin_attempts": 1, "sender_psp": "oksbi", "receiver_psp": "okaxis",
+        "transaction_status": "SUCCESS", "receiver_is_new": True,
+        "receiver_age_hours": 2.0, "merchant_vpa_age_hours": 12.0,
+        "merchant_transactions_1h": 0, "sender_transactions_10m": 1,
+        "small_failed_transactions_1h": 0, "amount_to_sender_average": 8.0,
+    },
+    "qr": {
+        "amount": 2_400.0, "transaction_type": "P2M", "initiation_mode": "Scan QR",
+        "merchant_mcc": 5411.0, "failed_pin_attempts": 0,
+        "sender_psp": "okhdfcbank", "receiver_psp": "ybl",
+        "transaction_status": "SUCCESS", "receiver_is_new": True,
+        "receiver_age_hours": 1.0, "merchant_vpa_age_hours": 3.0,
+        "merchant_transactions_1h": 8, "sender_transactions_10m": 1,
+        "small_failed_transactions_1h": 0, "amount_to_sender_average": 3.5,
+    },
+    "velocity": {
+        "amount": 22_000.0, "transaction_type": "P2P",
+        "initiation_mode": "Contact/Phone Number", "merchant_mcc": None,
+        "failed_pin_attempts": 3, "sender_psp": "okicici", "receiver_psp": "oksbi",
+        "transaction_status": "SUCCESS", "receiver_is_new": False,
+        "receiver_age_hours": 4_000.0, "merchant_vpa_age_hours": 2_160.0,
+        "merchant_transactions_1h": 0, "sender_transactions_10m": 4,
+        "small_failed_transactions_1h": 3, "amount_to_sender_average": 18.0,
+    },
+}
+UPI_FORM_DEFAULTS = {
+    "amount": 250.0, "transaction_type": "P2P",
+    "initiation_mode": "Contact/Phone Number", "merchant_mcc": None,
+    "failed_pin_attempts": 0, "sender_psp": "okaxis", "receiver_psp": "ybl",
+    "transaction_status": "SUCCESS", "receiver_is_new": False,
+    "receiver_age_hours": 2_400.0, "merchant_vpa_age_hours": 2_160.0,
+    "merchant_transactions_1h": 2, "sender_transactions_10m": 1,
+    "small_failed_transactions_1h": 0, "amount_to_sender_average": 1.0,
+}
+
+
+@st.cache_resource(show_spinner=False)
+def load_upi_artifacts():
+    import pickle
+
+    if not UPI_MODEL_PATH.exists():
+        raise FileNotFoundError(
+            "UPI synthetic model is missing. Run the UPI generator and training commands from the README."
+        )
+    if not UPI_COEFFICIENTS_PATH.exists():
+        raise FileNotFoundError(
+            "Exported UPI coefficient table is missing. Run the UPI training command from the README."
+        )
+    with UPI_MODEL_PATH.open("rb") as model_file:
+        bundle = pickle.load(model_file)
+    coefficients = pd.read_csv(UPI_COEFFICIENTS_PATH)
+    required = {"feature", "log_odds_coefficient"}
+    if not required.issubset(coefficients.columns):
+        raise ValueError("UPI coefficient CSV does not have the expected columns")
+    preprocessor = bundle["pipeline"].named_steps["preprocess"]
+    model_features = preprocessor.get_feature_names_out()
+    if set(model_features) != set(coefficients["feature"]):
+        raise ValueError("UPI model and exported coefficient features do not match")
+    return bundle, coefficients
+
+
+def _upi_category_options(bundle, category):
+    category_names = bundle["categorical_features"]
+    category_index = category_names.index(category)
+    encoded = bundle["pipeline"].named_steps["preprocess"].named_transformers_["categorical"]
+    levels = encoded.named_steps["onehot"].categories_[category_index]
+    return [str(level) for level in levels if str(level) != "Unknown"]
+
+
+def _apply_upi_preset(name):
+    for field, value in UPI_PRESETS[name].items():
+        st.session_state[f"upi_{field}"] = value
+    st.session_state["upi_loaded_preset"] = name
+
+
+def _upi_feature_label(encoded_name, categorical_features):
+    if encoded_name.startswith("numeric__"):
+        raw_name = encoded_name.removeprefix("numeric__")
+        labels = {
+            "amount": "Transaction amount",
+            "failed_pin_attempts": "Failed PIN attempts",
+            "receiver_is_new": "New receiver indicator",
+            "receiver_age_hours": "Receiver age (hours)",
+            "merchant_vpa_age_hours": "Merchant VPA age (hours)",
+            "merchant_transactions_1h": "Merchant transactions in one hour",
+            "sender_transactions_10m": "Sender transactions in ten minutes",
+            "small_failed_transactions_1h": "Small failed transactions in one hour",
+            "amount_to_sender_average": "Amount / sender average",
+            "transaction_hour_utc": "Transaction hour (UTC)",
+            "transaction_dayofweek_utc": "Transaction weekday (UTC)",
+        }
+        return labels.get(raw_name, raw_name.replace("_", " "))
+    raw_name = encoded_name.removeprefix("categorical__")
+    for category in sorted(categorical_features, key=len, reverse=True):
+        prefix = f"{category}_"
+        if raw_name.startswith(prefix):
+            value = raw_name.removeprefix(prefix)
+            label = {
+                "transaction_type": "Transaction type",
+                "initiation_mode": "Initiation mode",
+                "merchant_mcc": "Merchant MCC",
+                "transaction_status": "Transaction status",
+                "sender_psp": "Sender PSP",
+                "receiver_psp": "Receiver PSP",
+            }.get(category, category.replace("_", " "))
+            return f"{label}: {value}"
+    return raw_name.replace("_", " ")
+
+
+def _upi_row_from_form(values):
+    from upi_synthetic.train_model import prepare_features
+
+    now = pd.Timestamp.now(tz="UTC")
+    row = pd.DataFrame([{
+        "transaction_id": "UPI-DEMO-INPUT",
+        "timestamp": now,
+        "amount": float(values["amount"]),
+        "sender_vpa": f"demo.sender@{values['sender_psp']}",
+        "receiver_vpa": f"demo.receiver@{values['receiver_psp']}",
+        "transaction_type": values["transaction_type"],
+        "initiation_mode": values["initiation_mode"],
+        "merchant_mcc": values["merchant_mcc"] if values["transaction_type"] == "P2M" else None,
+        "failed_pin_attempts": int(values["failed_pin_attempts"]),
+        "transaction_status": values["transaction_status"],
+        "receiver_is_new": int(values["receiver_is_new"]),
+        "receiver_age_hours": float(values["receiver_age_hours"]),
+        "merchant_vpa_age_hours": (
+            float(values["merchant_vpa_age_hours"])
+            if values["transaction_type"] == "P2M" else np.nan
+        ),
+        "merchant_transactions_1h": (
+            int(values["merchant_transactions_1h"])
+            if values["transaction_type"] == "P2M" else 0
+        ),
+        "sender_transactions_10m": int(values["sender_transactions_10m"]),
+        "small_failed_transactions_1h": int(values["small_failed_transactions_1h"]),
+        "amount_to_sender_average": float(values["amount_to_sender_average"]),
+    }])
+    features, _ = prepare_features(row)
+    return features
+
+
+def _score_upi_form(bundle, coefficients, values):
+    features = _upi_row_from_form(values).reindex(columns=bundle["features"])
+    pipeline = bundle["pipeline"]
+    probability = float(pipeline.predict_proba(features)[:, 1][0])
+    preprocessor = pipeline.named_steps["preprocess"]
+    encoded = preprocessor.transform(features)
+    encoded = encoded.toarray()[0] if hasattr(encoded, "toarray") else np.asarray(encoded)[0]
+    names = preprocessor.get_feature_names_out()
+    coefficient_map = coefficients.set_index("feature")["log_odds_coefficient"]
+    weights = coefficient_map.reindex(names).to_numpy(dtype=float)
+    contributions = encoded * weights
+    active = np.flatnonzero(np.abs(contributions) > 1e-10)
+    order = active[np.argsort(np.abs(contributions[active]))[::-1]][:8]
+    drivers = pd.DataFrame({
+        "feature": [_upi_feature_label(names[i], bundle["categorical_features"]) for i in order],
+        "contribution_log_odds": contributions[order],
+        "coefficient": weights[order],
+    })
+    return probability, drivers
+
+
+def render_upi_live_scoring():
+    st.info("Demonstration on synthetic UPI-like data modeling documented fraud typologies.")
+    st.caption(
+        "This separate synthetic model is not connected to the existing fraud API. "
+        "Its prediction is a demonstration on generated scenarios, not real UPI performance."
+    )
+    try:
+        bundle, coefficients = load_upi_artifacts()
+    except (FileNotFoundError, ValueError, KeyError, OSError) as exc:
+        st.error(str(exc))
+        return
+
+    sender_psps = _upi_category_options(bundle, "sender_psp")
+    receiver_psps = _upi_category_options(bundle, "receiver_psp")
+    mcc_values = _upi_category_options(bundle, "merchant_mcc")
+    mcc_options = [None]
+    for value in mcc_values:
+        if value != "Unknown":
+            try:
+                mcc_options.append(float(value))
+            except ValueError:
+                continue
+    for field, default in UPI_FORM_DEFAULTS.items():
+        if field == "sender_psp" and default not in sender_psps:
+            default = sender_psps[0]
+        if field == "receiver_psp" and default not in receiver_psps:
+            default = receiver_psps[0]
+        st.session_state.setdefault(f"upi_{field}", default)
+
+    st.markdown("### Load a scenario")
+    example_columns = st.columns(3)
+    examples = [
+        ("collect", "Collect request scam"),
+        ("qr", "QR code spoofing"),
+        ("velocity", "Velocity attack"),
+    ]
+    for column, (preset_key, label) in zip(example_columns, examples):
+        with column:
+            st.button(
+                label, key=f"upi_example_{preset_key}",
+                on_click=_apply_upi_preset, args=(preset_key,), use_container_width=True,
+            )
+    loaded_preset = st.session_state.get("upi_loaded_preset")
+    if loaded_preset:
+        st.caption(f"Loaded scenario: {dict(examples)[loaded_preset]}. Review or edit its fields, then score it.")
+
+    st.markdown("### UPI transaction fields")
+    with st.form("upi_live_scoring_form"):
+        primary_left, primary_right = st.columns(2)
+        with primary_left:
+            amount = st.number_input(
+                "Amount", min_value=0.0, step=100.0, key="upi_amount",
+            )
+            transaction_type = st.selectbox(
+                "Transaction type", ["P2P", "P2M"], key="upi_transaction_type",
+            )
+            initiation_mode = st.selectbox(
+                "Initiation mode",
+                ["Collect Request", "Scan QR", "Contact/Phone Number"],
+                key="upi_initiation_mode",
+            )
+            merchant_mcc = st.selectbox(
+                "Merchant MCC", mcc_options, key="upi_merchant_mcc",
+                format_func=lambda value: "Not applicable / unknown" if value is None else str(int(value)),
+            )
+        with primary_right:
+            failed_pin_attempts = st.number_input(
+                "Failed PIN attempts before success", min_value=0, max_value=20,
+                step=1, key="upi_failed_pin_attempts",
+            )
+            sender_psp = st.selectbox("Sender PSP", sender_psps, key="upi_sender_psp")
+            receiver_psp = st.selectbox("Receiver PSP", receiver_psps, key="upi_receiver_psp")
+        with st.expander("Scenario context features used by this model", expanded=False):
+            context_left, context_right = st.columns(2)
+            with context_left:
+                transaction_status = st.selectbox(
+                    "Transaction status", ["SUCCESS", "FAILED"], key="upi_transaction_status",
+                )
+                receiver_is_new = st.checkbox("Receiver VPA is new to sender", key="upi_receiver_is_new")
+                receiver_age_hours = st.number_input(
+                    "Receiver VPA age (hours)", min_value=0.0, step=1.0,
+                    key="upi_receiver_age_hours",
+                )
+                merchant_vpa_age_hours = st.number_input(
+                    "Merchant VPA age (hours)", min_value=0.0, step=1.0,
+                    key="upi_merchant_vpa_age_hours",
+                )
+            with context_right:
+                merchant_transactions_1h = st.number_input(
+                    "Transactions to merchant in one hour", min_value=0, step=1,
+                    key="upi_merchant_transactions_1h",
+                )
+                sender_transactions_10m = st.number_input(
+                    "Sender transactions in ten minutes", min_value=0, step=1,
+                    key="upi_sender_transactions_10m",
+                )
+                small_failed_transactions_1h = st.number_input(
+                    "Small failed transactions in one hour", min_value=0, step=1,
+                    key="upi_small_failed_transactions_1h",
+                )
+                amount_to_sender_average = st.number_input(
+                    "Amount / sender's average amount", min_value=0.0, step=0.5,
+                    key="upi_amount_to_sender_average",
+                )
+        submitted = st.form_submit_button("Score UPI transaction", use_container_width=True)
+
+    if submitted:
+        values = {
+            "amount": amount, "transaction_type": transaction_type,
+            "initiation_mode": initiation_mode, "merchant_mcc": merchant_mcc,
+            "failed_pin_attempts": failed_pin_attempts,
+            "sender_psp": sender_psp, "receiver_psp": receiver_psp,
+            "transaction_status": transaction_status, "receiver_is_new": receiver_is_new,
+            "receiver_age_hours": receiver_age_hours,
+            "merchant_vpa_age_hours": merchant_vpa_age_hours,
+            "merchant_transactions_1h": merchant_transactions_1h,
+            "sender_transactions_10m": sender_transactions_10m,
+            "small_failed_transactions_1h": small_failed_transactions_1h,
+            "amount_to_sender_average": amount_to_sender_average,
+        }
+        try:
+            probability, drivers = _score_upi_form(bundle, coefficients, values)
+            threshold = float(bundle["threshold"])
+        except (ValueError, KeyError, TypeError) as exc:
+            st.error(f"UPI model scoring failed: {exc}")
+            return
+
+        fraud_alert = probability >= threshold
+        st.markdown("---")
+        st.markdown("### UPI model result")
+        score_col, decision_col = st.columns([1, 2])
+        with score_col:
+            st.metric("Fraud probability", f"{probability:.1%}")
+            st.progress(probability, text="Synthetic model fraud probability")
+        with decision_col:
+            st.markdown("**Prediction**")
+            if fraud_alert:
+                st.error(f"Fraud alert · score meets the validation threshold ({threshold:.1%}).")
+            else:
+                st.success(f"Below fraud alert threshold ({threshold:.1%}).")
+            st.caption(
+                f"Model: {bundle['name']} · decision threshold selected on validation. "
+                "This is a synthetic scenario model, not a production UPI decision."
+            )
+
+        st.markdown("#### Features driving this score")
+        st.caption(
+            "Local additive terms calculated from the saved model's transformed inputs and exported coefficients. "
+            "Positive log-odds contributions raise the fraud score; negative contributions lower it. "
+            "These are model contributions, not causal claims."
+        )
+        if drivers.empty:
+            st.info("No non-zero coefficient contributions were returned for this input.")
+        else:
+            colors = ["#b43732" if value > 0 else "#187457"
+                      for value in drivers["contribution_log_odds"]]
+            fig = go.Figure(go.Bar(
+                x=drivers["contribution_log_odds"], y=drivers["feature"],
+                orientation="h", marker_color=colors,
+                customdata=drivers["coefficient"],
+                hovertemplate=("%{y}<br>Contribution: %{x:.4f} log-odds"
+                               "<br>Exported coefficient: %{customdata:.4f}<extra></extra>"),
+            ))
+            fig.add_vline(x=0, line_color="#7d8991", line_width=1)
+            fig.update_layout(
+                height=max(260, 42 * len(drivers)),
+                margin=dict(l=8, r=12, t=8, b=24),
+                xaxis_title="Contribution to model log-odds",
+                yaxis_title="", showlegend=False,
+                plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+                font=dict(family="Segoe UI, Arial, sans-serif", color="#172635", size=12),
+                xaxis=dict(showgrid=True, gridcolor="#e8edf0"),
+                yaxis=dict(autorange="reversed"),
+            )
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+            st.dataframe(
+                drivers.rename(columns={
+                    "feature": "Feature", "contribution_log_odds": "Contribution (log-odds)",
+                    "coefficient": "Exported coefficient",
+                }).round(4), hide_index=True, width="stretch",
+            )
+
+
 def main():
     demo = load_demo()
     try:
@@ -563,8 +993,9 @@ def main():
         )
 
     render_session_overview()
-    transaction_tab, text_tab, graph_tab, model_tab = st.tabs(
-        ["Transaction workbench", "SMS / URL screening", "Graph risk", "Model & evaluation"]
+    transaction_tab, text_tab, graph_tab, model_tab, upi_tab = st.tabs(
+        ["Transaction workbench", "SMS / URL screening", "Graph risk", "Model & evaluation",
+         "UPI Live Scoring"]
     )
     with transaction_tab:
         render_transaction_tab(demo, api_online)
@@ -574,6 +1005,8 @@ def main():
         render_graph_tab(api_online)
     with model_tab:
         render_model_tab(api_online, health)
+    with upi_tab:
+        render_upi_live_scoring()
 
 
 if __name__ == "__main__":
