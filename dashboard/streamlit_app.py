@@ -972,7 +972,7 @@ def main():
     loaded_models = ", ".join(health.get("models_loaded", [])) if api_online else "API offline"
     st.markdown('<div class="eyebrow">Fraud intelligence · capstone demonstration</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="hero"><div class="hero-kicker">Digital payments · tabular + graph + text</div>'
+        '<div class="hero"><div class="hero-kicker">UPI fraud research · proxy models + synthetic demo</div>'
         '<div class="hero-title">UPI Fraud Detection & Explainability</div>'
         '<p class="hero-copy">A local research prototype for transaction risk scoring. Inspect the model score, '
         'the validation threshold, and the feature contributions behind each tabular decision.</p></div>',
