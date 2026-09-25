@@ -2,6 +2,27 @@
 
 This project demonstrates fraud-risk scoring with tabular, transaction-graph, and text models, plus explainability and a local API/dashboard demo. It does **not** measure fraud performance on UPI transactions: public transaction-level UPI fraud data is unavailable. IEEE-CIS, Elliptic, ULB credit-card data, SMS Spam Collection, and phishing URLs are real datasets; PaySim is synthetic and is used only as a baseline.
 
+## UPI-specific synthetic demonstration
+
+The separate [`upi_synthetic/`](upi_synthetic/) module adds a reproducible UPI-like scenario generator and a standalone logistic-regression training pipeline. It does not replace or feed into the existing IEEE-CIS, Elliptic, SMS, or URL pipelines, model artifacts, API endpoints, or dashboard tabs. The generated rows are synthetic and are **not** observed UPI transactions or evidence of real-world UPI performance.
+
+The generator labels three deliberately constructed scenarios:
+
+- **Collect request scam:** a high-value P2P collect request to a newly seen receiver VPA.
+- **QR code spoofing:** a burst of P2M payments to a newly created merchant VPA, with a high one-hour merchant transaction count.
+- **Velocity attack:** several small failed transactions from one sender, followed by a much larger successful payment. The final row carries the preceding failure/count features.
+
+The new model one-hot encodes transaction type, initiation mode, merchant MCC, transaction status, and VPA provider handles. Raw sender and receiver VPAs are excluded as model inputs to avoid memorizing synthetic account identifiers; derived provider categories and scenario signals are used instead. Its chronological train/validation/test split tunes the F1 threshold on validation only. Standardized logistic-regression coefficients provide a compact model-level explanation; they are not transaction-specific causal explanations.
+
+Generate the dataset and train this separate model from the project root:
+
+```powershell
+.\.venv\Scripts\python.exe -m upi_synthetic.generate_data
+.\.venv\Scripts\python.exe -m upi_synthetic.train_model
+```
+
+The generated CSV, evaluation CSVs, and coefficient table are written under `notebooks/upi_synthetic_report/`; the additional model is `models/upi_synthetic_model.pkl`. These outputs are ignored by Git. Re-run the generator to reproduce the dataset. Do not present synthetic metrics as evidence of real UPI fraud detection performance.
+
 ## Verified results
 
 Every metric below is copied from the referenced CSV. Smoke-test outputs are excluded.
