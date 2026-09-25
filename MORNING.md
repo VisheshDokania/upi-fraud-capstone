@@ -1,3 +1,7 @@
+# Historical status snapshot
+
+> This records an earlier master-branch milestone, not the current `upi-synthetic` branch or a live status check. See [README.md](README.md) for the latest documented code and caveats.
+
 ﻿# MORNING status — capstone follow-up
 
 Steps A–G are complete. Each step was committed and pushed to `origin/master`; no files were deleted, `data/` and scripts 01–07 were not edited, and no packages were installed.
