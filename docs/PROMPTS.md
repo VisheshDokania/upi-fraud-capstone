@@ -1,3 +1,7 @@
+# Historical prompts - not current project state
+
+> These prompts were written for earlier build stages. They contain an old title and obsolete "not yet run" statements. Do not paste them as current instructions; see the root [README](../README.md) and [DEMO](../DEMO.md) for the `upi-synthetic` branch.
+
 # Prompts
 
 Use these in Codex (ChatGPT Plus) inside VS Code, with the project folder open.

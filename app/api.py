@@ -27,7 +27,7 @@ MODEL_DIR = ROOT / "models"
 FUSION_DIR = ROOT / "notebooks" / "fusion_report"
 GRAPH_DIR = ROOT / "notebooks" / "graph_pipeline"
 
-app = FastAPI(title="UPI / Digital Payment Fraud Detection API", version="1.0")
+app = FastAPI(title="Real Time UPI Fraud Detection - Proxy Research API", version="1.0")
 STATE: Dict[str, Any] = {}
 
 
